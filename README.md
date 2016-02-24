@@ -5,7 +5,10 @@ Separaten into several eclipse-maven projects
 
 ### How To Run
 
-Import projects into Eclipse
-Run startPlatform launch config from Eclise
-Run startChatParticipatn launch config from Eclise
-For another chat participant instance just clone/modify startChatParticipatn with another unique agent name
+1.Import projects into Eclipse
+
+2.Run startPlatform launch config from Eclise
+
+3.Run startChatParticipatn launch config from Eclise
+
+4.For another chat participant instance just clone/modify startChatParticipatn with another unique agent name
