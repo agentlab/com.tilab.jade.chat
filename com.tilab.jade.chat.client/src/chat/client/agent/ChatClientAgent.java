@@ -35,6 +35,10 @@ import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.CyclicBehaviour;
 import jade.core.behaviours.OneShotBehaviour;
+import jade.domain.DFService;
+import jade.domain.FIPAException;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
@@ -42,6 +46,9 @@ import jade.util.leap.Iterator;
 import jade.util.leap.Set;
 import jade.util.leap.SortedSetImpl;
 import chat.client.ChatGui;
+
+import java.util.Random;
+
 /*#MIDP_INCLUDE_BEGIN
 import chat.client.MIDPChatGui;
 #MIDP_INCLUDE_END*/
@@ -70,7 +77,7 @@ public class ChatClientAgent extends Agent {
 	private Logger logger = Logger.getMyLogger(this.getClass().getName());
 
 	private static final String CHAT_ID = "__chat__";
-	private static final String CHAT_MANAGER_NAME = "manager";
+	//private String CHAT_MANAGER_NAME = "manager";
 
 	private ChatGui myGui;
 	private Set participants = new SortedSetImpl();
@@ -78,20 +85,41 @@ public class ChatClientAgent extends Agent {
 	private Ontology onto = ChatOntology.getInstance();
 	private ACLMessage spokenMsg;
 
+	private AID[] chartManagerAgents;
+	private AID myManager;
+	 
 	protected void setup() {
 		// Register language and ontology
 		ContentManager cm = getContentManager();
 		cm.registerLanguage(codec);
 		cm.registerOntology(onto);
 		cm.setValidationMode(false);
-
+		
+		DFAgentDescription dfTemplate = new DFAgentDescription();
+		ServiceDescription sd = new ServiceDescription();
+		sd.setType("manager");
+		dfTemplate.addServices(sd);
+		try {
+			DFAgentDescription[] result = DFService.search(this, dfTemplate);
+			chartManagerAgents = new AID[result.length];
+			for (int i = 0; i < result.length; ++i) {
+				chartManagerAgents[i] = result[i].getName();
+			}
+		} catch (FIPAException fe) {
+			fe.printStackTrace();
+		}
+		
+		Random rand = new Random();
+		myManager = chartManagerAgents[rand.nextInt(chartManagerAgents.length)];
+		
 		// Add initial behaviours
 		addBehaviour(new ParticipantsManager(this));
 		addBehaviour(new ChatListener(this));
 
 		// Initialize the message used to convey spoken sentences
 		spokenMsg = new ACLMessage(ACLMessage.INFORM);
-		spokenMsg.setConversationId(CHAT_ID);
+		spokenMsg.setConversationId(myManager.getName());
+		//spokenMsg.setConversationId(CHAT_ID);
 
 		// Activate the GUI
 		myGui = new AWTChatGui(this);
@@ -125,6 +153,9 @@ public class ChatClientAgent extends Agent {
 		}
 
 		public void onStart() {
+			
+			//AID managerAID = new AID(CHAT_MANAGER_NAME, AID.ISLOCALNAME);
+			
 			// Subscribe as a chat participant to the ChatManager agent
 			ACLMessage subscription = new ACLMessage(ACLMessage.SUBSCRIBE);
 			subscription.setLanguage(codec.getName());
@@ -132,7 +163,7 @@ public class ChatClientAgent extends Agent {
 			String convId = "C-" + myAgent.getLocalName();
 			subscription.setConversationId(convId);
 			subscription
-					.addReceiver(new AID(CHAT_MANAGER_NAME, AID.ISLOCALNAME));
+					.addReceiver(myManager);
 			myAgent.send(subscription);
 			// Initialize the template used to receive notifications
 			// from the ChatManagerAgent
@@ -199,7 +230,7 @@ public class ChatClientAgent extends Agent {
 	class ChatListener extends CyclicBehaviour {
 		private static final long serialVersionUID = 741233963737842521L;
 		private MessageTemplate template = MessageTemplate
-				.MatchConversationId(CHAT_ID);
+				.MatchConversationId(myManager.getName());
 
 		ChatListener(Agent a) {
 			super(a);

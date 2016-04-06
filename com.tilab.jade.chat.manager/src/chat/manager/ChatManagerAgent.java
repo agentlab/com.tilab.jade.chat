@@ -39,7 +39,11 @@ import jade.proto.SubscriptionResponder;
 import jade.proto.SubscriptionResponder.SubscriptionManager;
 import jade.proto.SubscriptionResponder.Subscription;
 import jade.domain.FIPAAgentManagement.RefuseException;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAAgentManagement.NotUnderstoodException;
+import jade.domain.DFService;
+import jade.domain.FIPAException;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.FailureException;
 
 import jade.domain.introspection.IntrospectionOntology;
@@ -103,11 +107,29 @@ public class ChatManagerAgent extends Agent implements SubscriptionManager {
 			}
 		};
 		addBehaviour(myAMSSubscriber);
+		DFAgentDescription dfd = new DFAgentDescription();
+		dfd.setName(getAID());
+		ServiceDescription sd = new ServiceDescription();
+		sd.setType("manager");
+		sd.setName("chart");
+		dfd.addServices(sd);
+		try {
+			DFService.register(this, dfd);
+		}
+		catch (FIPAException fe) {
+			fe.printStackTrace();
+		}
 	}
 
 	protected void takeDown() {
 		// Unsubscribe from the AMS
 		send(myAMSSubscriber.getCancel());
+		try {
+			DFService.deregister(this);
+		}
+		catch (FIPAException fe) {
+			fe.printStackTrace();
+		}
 		//FIXME: should inform current participants if any
 	}
 
