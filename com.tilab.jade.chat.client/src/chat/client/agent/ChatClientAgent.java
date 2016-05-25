@@ -46,7 +46,7 @@ import jade.util.leap.Iterator;
 import jade.util.leap.Set;
 import jade.util.leap.SortedSetImpl;
 import chat.client.ChatGui;
-
+import jade.domain.FIPANames;
 import java.util.Random;
 
 /*#MIDP_INCLUDE_BEGIN
@@ -359,6 +359,7 @@ public class ChatClientAgent extends Agent {
 			}
 			Random rand = new Random();
 			myManager = chartManagerAgents[rand.nextInt(chartManagerAgents.length)];
+			spokenMsg.setProtocol(FIPANames.InteractionProtocol.FIPA_RECRUITING);
 			spokenMsg = new ACLMessage(ACLMessage.INFORM);
 			spokenMsg.setConversationId(myManager.getName());
 		}
