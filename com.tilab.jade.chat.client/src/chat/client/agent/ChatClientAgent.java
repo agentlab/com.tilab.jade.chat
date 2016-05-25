@@ -95,31 +95,10 @@ public class ChatClientAgent extends Agent {
 		cm.registerOntology(onto);
 		cm.setValidationMode(false);
 		
-		DFAgentDescription dfTemplate = new DFAgentDescription();
-		ServiceDescription sd = new ServiceDescription();
-		sd.setType("manager");
-		dfTemplate.addServices(sd);
-		try {
-			DFAgentDescription[] result = DFService.search(this, dfTemplate);
-			chartManagerAgents = new AID[result.length];
-			for (int i = 0; i < result.length; ++i) {
-				chartManagerAgents[i] = result[i].getName();
-			}
-		} catch (FIPAException fe) {
-			fe.printStackTrace();
-		}
-		
-		Random rand = new Random();
-		myManager = chartManagerAgents[rand.nextInt(chartManagerAgents.length)];
-		
 		// Add initial behaviours
+		addBehaviour(new ManagerSearchBehaviour(this));
 		addBehaviour(new ParticipantsManager(this));
 		addBehaviour(new ChatListener(this));
-
-		// Initialize the message used to convey spoken sentences
-		spokenMsg = new ACLMessage(ACLMessage.INFORM);
-		spokenMsg.setConversationId(myManager.getName());
-		//spokenMsg.setConversationId(CHAT_ID);
 
 		// Activate the GUI
 		myGui = new AWTChatGui(this);
@@ -147,7 +126,10 @@ public class ChatClientAgent extends Agent {
 	class ParticipantsManager extends CyclicBehaviour {
 		private static final long serialVersionUID = -4845730529175649756L;
 		private MessageTemplate template;
-
+		
+		private ACLMessage subscription; 
+		private AID manager;
+		
 		ParticipantsManager(Agent a) {
 			super(a);
 		}
@@ -157,13 +139,11 @@ public class ChatClientAgent extends Agent {
 			//AID managerAID = new AID(CHAT_MANAGER_NAME, AID.ISLOCALNAME);
 			
 			// Subscribe as a chat participant to the ChatManager agent
-			ACLMessage subscription = new ACLMessage(ACLMessage.SUBSCRIBE);
+			subscription = new ACLMessage(ACLMessage.SUBSCRIBE);
 			subscription.setLanguage(codec.getName());
 			subscription.setOntology(onto.getName());
 			String convId = "C-" + myAgent.getLocalName();
 			subscription.setConversationId(convId);
-			subscription
-					.addReceiver(myManager);
 			myAgent.send(subscription);
 			// Initialize the template used to receive notifications
 			// from the ChatManagerAgent
@@ -171,6 +151,7 @@ public class ChatClientAgent extends Agent {
 		}
 
 		public void action() {
+			checkManager();
 			// Receives information about people joining and leaving
 			// the chat from the ChatManager agent
 			ACLMessage msg = myAgent.receive(template);
@@ -220,6 +201,26 @@ public class ChatClientAgent extends Agent {
 				block();
 			}
 		}
+		
+		void checkManager()
+		{
+			if (myManager != null)
+			{
+				if (manager == null)
+				{
+					manager = myManager;
+					subscription.addReceiver(manager);
+					myAgent.send(subscription);
+				}
+				else if (!myManager.equals(manager))
+				{
+					subscription.removeReceiver(manager);
+					manager = myManager;
+					subscription.addReceiver(manager);
+					myAgent.send(subscription);
+				}
+			}
+		}
 	} // END of inner class ParticipantsManager
 
 	/**
@@ -229,14 +230,15 @@ public class ChatClientAgent extends Agent {
 	 */
 	class ChatListener extends CyclicBehaviour {
 		private static final long serialVersionUID = 741233963737842521L;
-		private MessageTemplate template = MessageTemplate
-				.MatchConversationId(myManager.getName());
+		private AID manager;
+		private MessageTemplate template;
 
 		ChatListener(Agent a) {
 			super(a);
 		}
 
 		public void action() {
+			checkManager();
 			ACLMessage msg = myAgent.receive(template);
 			if (msg != null) {
 				if (msg.getPerformative() == ACLMessage.INFORM) {
@@ -247,6 +249,16 @@ public class ChatClientAgent extends Agent {
 				}
 			} else {
 				block();
+			}
+		}
+		
+		private void checkManager()
+		{
+			if (myManager != null && !myManager.equals(manager))
+			{
+				manager = myManager;
+				template = MessageTemplate
+						.MatchConversationId(manager.getName());
 			}
 		}
 	} // END of inner class ChatListener
@@ -305,6 +317,52 @@ public class ChatClientAgent extends Agent {
 					+ msg.getSender().getName());
 			logger.log(Logger.WARNING, "Content is: " + msg.getContent());
 		}
+	}
+	
+	private class ManagerSearchBehaviour extends CyclicBehaviour
+	{
+		private static final long serialVersionUID = 4715766411703805482L;
+		private DFAgentDescription dfTemplate;
+		
+		public ManagerSearchBehaviour(Agent a) {
+			super(a);
+			dfTemplate = new DFAgentDescription();
+			ServiceDescription sd = new ServiceDescription();
+			sd.setType("manager");
+			dfTemplate.addServices(sd);
+			
+			action();
+		}
+
+		@Override
+		public void action() {
+			try {
+				DFAgentDescription[] result = DFService.search(ChatClientAgent.this, dfTemplate);
+				chartManagerAgents = new AID[result.length];
+				for (int i = 0; i < result.length; ++i) {
+					chartManagerAgents[i] = result[i].getName();
+				}
+			} catch (FIPAException fe) {
+				fe.printStackTrace();
+			}
+
+			checkMyManager();
+
+		}
+		
+		void checkMyManager()
+		{
+			for (AID manager : chartManagerAgents)
+			{
+				if (manager.equals(myManager))
+					return;
+			}
+			Random rand = new Random();
+			myManager = chartManagerAgents[rand.nextInt(chartManagerAgents.length)];
+			spokenMsg = new ACLMessage(ACLMessage.INFORM);
+			spokenMsg.setConversationId(myManager.getName());
+		}
+
 	}
 
 }
